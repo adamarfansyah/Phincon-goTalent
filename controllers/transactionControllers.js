@@ -81,7 +81,11 @@ exports.updateStatusTransaction = async (req, res) => {
 
     const transaction = await Transaction.findOne({ where: { user_id: id, tokenPayment: token } });
 
-    await transaction.update({ status: "settlement" });
+    if (!transaction) {
+      return res.status(404).send(SendResponse(404, "Transaction not found", null, null));
+    }
+
+    await transaction.update({ status: "settlement", tokenPayment: null });
 
     return res.status(201).send(SendResponse(201, "success", null, transaction));
   } catch (error) {

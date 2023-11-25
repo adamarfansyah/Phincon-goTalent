@@ -257,7 +257,7 @@ exports.updateCountParticipantCourse = async (req, res) => {
       return res.status(404).send(SendResponse(404, "Data Not Found", null, null));
     }
 
-    if (isPaidTransaction.status === "pending") {
+    if (isPaidTransaction?.status === "pending" || !isPaidTransaction) {
       return res.status(400).send(SendResponse(400, "This User has not paid", null, null));
     }
 
@@ -267,7 +267,7 @@ exports.updateCountParticipantCourse = async (req, res) => {
         .send(SendResponse(400, "This user already registered on this course", null, null));
     }
 
-    if (course.count_participants > 0 && isPaidTransaction.status === "settlement") {
+    if (course?.count_participants > 0 && isPaidTransaction?.status === "settlement") {
       course.count_participants -= 1;
       await course.save();
 

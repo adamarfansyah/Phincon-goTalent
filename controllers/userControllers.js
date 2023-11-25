@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const SendResponse = require("../helpers/SendResponse.js");
 const { Op } = require("sequelize");
 
-const { User, Role } = require("../models/index.js");
+const { User, Roles } = require("../models/index.js");
 const sendEmail = require("../helpers/SendEmail.js");
 const { GenerateToken, GenerateResetPasswordToken } = require("../helpers/GenerateToken.js");
 const { PasswordHashing, PasswordCompare } = require("../helpers/PasswordHelpers.js");
@@ -25,10 +25,9 @@ exports.getUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const user = await User.findByPk({
-      id,
+    const user = await User.findByPk(id, {
       attributes: ["id", "fullName", "email"],
-      include: "userRole",
+      include: "roleUser",
     });
 
     if (!user) return res.status(404).send(SendResponse(404, "User Not Found", null, null));
@@ -126,7 +125,7 @@ exports.updateUserRole = async (req, res) => {
     const { roleId } = req.body;
 
     const user = await User.findByPk(id);
-    const role = await Role.findByPk(roleId);
+    const role = await Roles.findByPk(roleId);
     if (!user) {
       return res.status(404).send(SendResponse(404, "User Not Found", null, null));
     }
@@ -143,7 +142,7 @@ exports.updateUserRole = async (req, res) => {
       return res.status(400).send(SendResponse(400, error.details[0].message, null, null));
     }
 
-    const newRoleUser = await user.update({ roleId });
+    const newRoleUser = await user.update({ role_id: roleId });
     return res.status(200).send(SendResponse(200, "Success Update Role User", null, newRoleUser));
   } catch (error) {
     return res.status(500).send(SendResponse(500, "Internal Server Error", error, null));
@@ -268,7 +267,7 @@ exports.updateUserPassword = async (req, res) => {
 
     const schema = Joi.object({
       password: Joi.string().pattern(new RegExp("^[a-zA-Z0-9]{3,30}$")).required(),
-      confirmPassword: Joi.ref("password"),
+      confirmPassword: Joi.valid(Joi.ref("password")),
     });
 
     const { error } = schema.validate({ password, confirmPassword });
@@ -286,47 +285,6 @@ exports.updateUserPassword = async (req, res) => {
     return res
       .status(201)
       .send(SendResponse(201, "Success Update Password", null, newUserPassword));
-  } catch (error) {
-    return res.status(500).send(SendResponse(500, "Internal Server Error", error, null));
-  }
-};
-
-exports.resetPassword = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const { token } = req.params;
-
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    const user = await User.findOne({
-      where: {
-        tokenResetPassword: hashedToken,
-      },
-    });
-
-    if (!user) {
-      return res.status(400).send(SendResponse(400, "Invalid Token", null, null));
-    }
-
-    const schema = Joi.object({
-      password: Joi.string().min(6).required(),
-      confirmPassword: Joi.string().min(6).valid(Joi.ref("password")).required().messages({
-        "any.only": "Password and Confirm Password must match",
-      }),
-    });
-
-    const { error } = schema.validate(req.body);
-    if (error) {
-      return res
-        .status(400)
-        .send(SendResponse(400, "Validation error", error.details[0].message, null));
-    }
-
-    user.password = password;
-    user.tokenResetPassword = null;
-
-    await user.save();
-    return res.status(200).send(SendResponse(200, "Password update Success", null, null));
   } catch (error) {
     return res.status(500).send(SendResponse(500, "Internal Server Error", error, null));
   }
